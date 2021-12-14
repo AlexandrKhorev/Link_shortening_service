@@ -1,5 +1,6 @@
 import sqlite3 as sq
 import random as rnd
+import re
 
 with sq.connect('links.db', check_same_thread=False) as db:
     cursor = db.cursor()
@@ -11,17 +12,28 @@ with sq.connect('links.db', check_same_thread=False) as db:
         )""")
 
 
+def split_link(link):
+    host = re.search(r'://\w+:', link)
+    port = re.search(r':\d+', link)
+
+    host = host.group()[3:-1] if host else 'localhost'
+    port = port.group()[1:] if port else '5000'
+
+    return host, port
+
+
+def generate_token(token_length):
+    token = ''
+    alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+    token += rnd.choice(alphabet[10:]) + ''.join([rnd.choice(alphabet) for _ in range(token_length - 1)])
+    return token
+
+
 class Link_shortening:
     __token_length = 8
 
     def __init__(self, domain):
         self.domain = domain
-
-    def __generate_token(self):
-        token = ''
-        alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
-        token += rnd.choice(alphabet[10:]) + ''.join([rnd.choice(alphabet) for _ in range(self.__token_length - 1)])
-        return token
 
     def check_in_db(self, short_url):
         with sq.connect('links.db', check_same_thread=False) as db:
@@ -37,12 +49,12 @@ class Link_shortening:
         with sq.connect('links.db', check_same_thread=False) as db:
             cursor = db.cursor()
 
-            token_new = self.__generate_token()
+            token_new = generate_token(self.__token_length)
 
             if cursor.execute(f"""SELECT * FROM shorted_links WHERE url = '{url}'""").fetchone() is None:
                 while not cursor.execute(
                         f"""SELECT * FROM shorted_links WHERE token = '{token_new}'""").fetchone() is None:
-                    token_new = self.__generate_token()
+                    token_new = generate_token(self.__token_length)
                 cursor.execute(f"""INSERT INTO shorted_links (url, token) VALUES ('{url}', '{token_new}')""")
                 db.commit()
 
